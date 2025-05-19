@@ -1,6 +1,6 @@
 ### Frappe Vision
 
-A frappe app powered by computer vision models and seamless integration with tradinal ocr providers like AWS Textract, Google Document AI etc.
+A frappe app powered by computer vision models and seamless integration with traditional ocr providers like AWS Textract, Google Document AI etc.
 
 ### Installation
 
