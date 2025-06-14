@@ -1,0 +1,88 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-06-11 19:44:29.802642",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "template_details_section",
+  "document_type",
+  "column_break_vgki",
+  "is_enabled",
+  "description",
+  "section_break_oteo",
+  "field_mappings",
+  "child_mappings"
+ ],
+ "fields": [
+  {
+   "fieldname": "template_details_section",
+   "fieldtype": "Section Break",
+   "label": "Template Details"
+  },
+  {
+   "fieldname": "document_type",
+   "fieldtype": "Select",
+   "label": "Document Type",
+   "options": "\nSales Invoice\nPurchase Invoice\nReceipt\nBill\nDelivery Note\nPayment Receipt\nCredit Note\nDebit Note"
+  },
+  {
+   "fieldname": "column_break_vgki",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_enabled",
+   "fieldtype": "Check",
+   "label": "Is Enabled"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "section_break_oteo",
+   "fieldtype": "Section Break",
+   "label": "Mapping Details"
+  },
+  {
+   "fieldname": "field_mappings",
+   "fieldtype": "Table",
+   "label": "Field Mappings",
+   "options": "OCR Template Field Mapping"
+  },
+  {
+   "fieldname": "child_mappings",
+   "fieldtype": "Table",
+   "label": "Child Mappings",
+   "options": "OCR Template Child Mapping"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-06-11 19:59:05.164587",
+ "modified_by": "Administrator",
+ "module": "Frappe Vision",
+ "name": "Vision OCR Template",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

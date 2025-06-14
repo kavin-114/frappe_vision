@@ -1,0 +1,56 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-06-11 19:52:08.243998",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "standard_field",
+  "type",
+  "aliases",
+  "required"
+ ],
+ "fields": [
+  {
+   "fieldname": "standard_field",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Standard Field"
+  },
+  {
+   "fieldname": "aliases",
+   "fieldtype": "JSON",
+   "in_list_view": 1,
+   "label": "Aliases"
+  },
+  {
+   "default": "0",
+   "fieldname": "required",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Required"
+  },
+  {
+   "fieldname": "type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Type",
+   "options": "\nString\nDate\nFloat"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-06-11 19:56:00.706230",
+ "modified_by": "Administrator",
+ "module": "Frappe Vision",
+ "name": "OCR Template Field Mapping",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
