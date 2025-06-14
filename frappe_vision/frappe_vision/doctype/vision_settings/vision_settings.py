@@ -1,6 +1,7 @@
 # Copyright (c) 2025, Aerele Technologies Private Limited and contributors
 # For license information, please see license.txt
 
+import boto3.session
 import frappe
 import boto3
 from frappe.model.document import Document
@@ -35,12 +36,11 @@ class VisionSettings(Document):
 		except Exception as e:
 			frappe.msgprint(title="AWS Textract connection failed", msg=f"Failed to connect to AWS: {str(e)}", indicator='red')
 
-	def get_aws_client(self):
+	def get_aws_textract_session(self):
 		"""Get AWS Textract client"""
 		self.validate()
-		return boto3.client(
-			'textract',
+		return boto3.session.Session(
 			aws_access_key_id=self.aws_access_key_id,
 			aws_secret_access_key=self.get_password("aws_secret_access_key"),
-			region_name=self.aws_region
+			region_name=self.aws_region,
 		)

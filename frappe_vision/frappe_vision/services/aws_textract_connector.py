@@ -1,184 +1,357 @@
 import frappe
 import json
-from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
+import re
+import pandas as pd
+from PIL import Image
 from frappe import _
 from frappe_vision.frappe_vision.doctype.vision_log.vision_log import log_vision
 from trp.t_pipeline import add_kv_ocr_confidence
-from trp import Document as TextractDocument
-import trp.trp2 as t2
+from typing import List, Union
+from textractor import Textractor
+from textractor.parsers import response_parser
+from textractor.data.constants import TextractFeatures, TextractAPI
+from textractcaller import call_textract_expense, call_textract, Query, QueriesConfig, OutputConfig
+from textractor.entities.document import Document as TextractDocument
+from textractor.textractor import _image_to_byte_array
+from textractor.utils.pdf_utils import rasterize_pdf
+from textractor.exceptions import InputError, IncorrectMethodException
 
 class AWSTextractConnector:
-	"""Connector class for AWS Textract OCR processing in Frappe Vision."""
+    """Connector class for AWS Textract OCR processing in Frappe Vision."""
 
-	def __init__(self):
-		"""Initialize Textract client with credentials from Vision Settings."""
-		self.vision_settings = frappe.get_single("Vision Settings")
-		if not self.vision_settings.is_enabled:
-			frappe.throw(_("Vision Settings for OCR are not enabled. Please enable them to use AWS Textract."))
+    def __init__(self):
+        """Initialize Textract client with credentials from Vision Settings."""
+        self.vision_settings = frappe.get_single("Vision Settings")
+        if not self.vision_settings.is_enabled:
+            frappe.throw(_("Vision Settings for OCR are not enabled. Please enable them to use AWS Textract."))
 
-		self.client = self.vision_settings.get_aws_client()
+        self.session = self.vision_settings.get_aws_textract_session()
+        self.client = self.session.client("textract")
 
-	def analyze_document(self, file_url):
-		"""
-		Process a document (image or PDF) using AWS Textract's analyze_document API.
+        self.extractor = Textractor(
+            region_name=self.vision_settings.aws_region,
+            textract_client=self.client
+        )
 
-		Args:
-			file_url (str): Path to the document (JPEG, PNG, PDF, or TIFF) on the server.
+        self.queries = [
+            "What type of document in following Invoice, Bill, Receipt or Other?",
+            "What type of document?",
+            "What is the document title?"
+        ]
+        self.document_types = ["Invoice", "Receipt", "Bill"]
 
-		Returns:
-			dict: Extracted data including key-value pairs and tables.
+    def analyze_document(self, file_url, queries=None):
+        """
+        Process a document (image or PDF) using AWS Textract's analyze_document API.
 
-		Throws:
-			frappe.exceptions.ValidationError: If processing fails or file is invalid.
-		"""
+        Args:
+            file_url (str): Path to the document (JPEG, PNG, PDF, or TIFF) on the server.
 
-		file = frappe.db.get_value("File", {"file_url": file_url})
-		if file:
-			self.file_doc = frappe.get_doc("File", file)
+        Returns:
+            dict: Extracted data including key-value pairs and tables.
 
-		if not self.file_doc.file_type in ['JPG', 'JPEG', 'PNG', 'PDF']:
-			frappe.throw(_("Unsupported file format. Allowed: .jpg, .jpeg, .png, .pdf"))
+        Throws:
+            frappe.exceptions.ValidationError: If processing fails or file is invalid.
+        """
+        file = frappe.db.get_value("File", {"file_url": file_url})
+        if file:
+            self.file_doc = frappe.get_doc("File", file)
 
-		try:
-			# Read file as raw bytes (no base64 encoding needed with boto3)
-			file_content = self.file_doc.get_content()
+        if not self.file_doc.file_type in ['JPG', 'JPEG', 'PNG', 'PDF']:
+            frappe.throw(_("Unsupported file format. Allowed: .jpg, .jpeg, .png, .pdf"))
 
-			#testingpurpose
-			response = frappe.db.get_value("Vision Log", "f9ujfuink0", "response_data")
-			response = json.loads(response)
+        if queries is not None:
+            self.queries.append(queries)
 
-			# Format request for analyze_document
-			# response = self.client.analyze_document(
-			# 	Document={
-			# 		'Bytes': file_content
-			# 	},
-			# 	FeatureTypes=['FORMS', 'TABLES', 'QUERIES'],
-			# 	QueriesConfig={
-			# 		'Queries': [
-			# 			{
-			# 				'Text': 'What is type of document in following Invoice, Bill or Receipt?',
-			# 			}
-			# 		]
-			# 	}
-			# )
-			print("Successfully analyzed document with AWS Textract", response)
-			log_vision(provider="AWS Textract", method="POST", status="Success", url="analyze_document", status_code=200, request=None, response=json.dumps(response, indent=4))
-			return response
+        self.queries_config = QueriesConfig([Query(query) for query in self.queries])
+        document: TextractDocument = None
+        try:
+            file_path = self.file_doc.get_full_path()
+            try:
+                document = self.extractor.analyze_document(
+                    file_source=file_path,
+                    features=[TextractFeatures.QUERIES],
+                    queries=self.queries_config,
+                    save_image=True
+                )
+            except IncorrectMethodException:
+                document = self.extractor.start_document_analysis(
+                    file_source=file_path,
+                    features=[TextractFeatures.QUERIES],
+                    queries=self.queries_config,
+                    save_image=True
+                )
+            except Exception:
+                raise
 
-		except Exception as e:
-			print("Error during Textract document analysis:", str(e))
-			frappe.msgprint(_("Unexpected error during Textract processing: {0}").format(str(e)))
-			log_vision(provider="AWS Textract", method="POST", status="Failed", url="analyze_document", status_code=400, request=None, response=json.dumps(response, indent=4))
+            result = self.normalize_textract_document(document, file_path)
+            log_vision(
+                provider="AWS Textract",
+                method="POST",
+                status="Success",
+                url="analyze_document",
+                status_code=200,
+                request=None,
+                response=json.dumps(document.get("response", ""), indent=4)
+            )
+            return result
 
+        except Exception as e:
+            frappe.msgprint(_("Unexpected error during Textract processing: {0}").format(str(e)))
+            log_vision(
+                provider="AWS Textract",
+                method="POST",
+                status="Failed",
+                url="analyze_document",
+                status_code=400,
+                request=None,
+                response=json.dumps(document.response if document else "", indent=4)
+            )
 
-	def parse_textract_response(self, response):
-		"""
-		Parse Textract response using amazon-textract-response-parser and textractor.
+    def analyze_expense(self, file_url):
+        """
+        Process a document (image or PDF) using AWS Textract's analyze_document API.
 
-		Args:
-			response (Dict): Raw Textract API response.
-			file_content (bytes): Raw bytes of the document.
+        Args:
+            file_url (str): Path to the document (JPEG, PNG, PDF, or TIFF) on the server.
 
-		Returns:
-			Dict[str, Any]: Structured output with text, tables, and key-value pairs.
+        Returns:
+            dict: Extracted data including key-value pairs and tables.
 
-		Raises:
-			Exception: For parsing errors, logged and returned in output.
-		"""
-		structured_output = {
-			"text": [],
-			"tables": [],
-			"key_value_pairs": [],
-			"query_results": {},
-			"errors": []
-		}
+        Throws:
+            frappe.exceptions.ValidationError: If processing fails or file is invalid.
+        """
+        document = None
+        file = frappe.db.get_value("File", {"file_url": file_url})
+        if file:
+            self.file_doc = frappe.get_doc("File", file)
 
-		try:
-			# Parse with amazon-textract-response-parser
-			t_document: t2.TDocument = t2.TDocumentSchema().load(response)
-			t_document = add_kv_ocr_confidence(t_document)
-			doc = TextractDocument(t2.TDocumentSchema().dump(t_document))
+        if not self.file_doc.file_type in ['JPG', 'JPEG', 'PNG', 'PDF']:
+            frappe.throw(_("Unsupported file format. Allowed: .jpg, .jpeg, .png, .pdf"))
 
-			for page in doc.pages:
-				# Add unique text
-				for line in page.lines:
-					if line.text not in structured_output["text"]:
-						structured_output["text"].append(line.text)
+        try:
+            file_path = self.file_doc.get_full_path()
+            document = self.extractor.analyze_expense(
+                file_source=file_path,
+                save_image=True
+            )
+            log_vision(
+                provider="AWS Textract",
+                method="POST",
+                status="Success",
+                url="analyze_expense",
+                status_code=200,
+                request=None,
+                response=json.dumps(document.response if document else "", indent=4)
+            )
+            return document
 
-				# Add unique tables
-				for table in page.tables:
-					table_data = [[cell.text.strip() for cell in row.cells] for row in table.rows]
-					if table_data not in structured_output["tables"]:
-						structured_output["tables"].append(table_data)
+        except Exception as e:
+            frappe.msgprint(_("Unexpected error during Textract processing: {0}").format(str(e)))
+            log_vision(
+                provider="AWS Textract",
+                method="POST",
+                status="Failed",
+                url="analyze_expense",
+                status_code=400,
+                request=None,
+                response=json.dumps(document.response if document else "", indent=4)
+            )
 
-				# Add unique key-value pairs
-				for field in page.form.fields:
-					key = field.key.text.strip() if field.key else ""
-					value = field.value.text.strip() if field.value else ""
-					kv_pair = {"key": key, "value": value}
-					if kv_pair not in structured_output["key_value_pairs"]:
-						structured_output["key_value_pairs"].append(kv_pair)
+    def get_structured_output_from_document(self, document: TextractDocument):
+        """
+        Parse Textract response using amazon-textract-response-parser and textractor.
 
-			# Parse query results
-			structured_output["query_results"] = self.parse_query_block(response.get("Blocks", []))
-			print("Successfully parsed Textract response")
-			log_vision(provider="AWS Textract", method="POST", status="Success", url="parse_textract_response", status_code=200, request=None, response=json.dumps(structured_output, indent=4))
+        Args:
+            document (Dict): Raw Textract API response.
 
-			return structured_output
+        Returns:
+            Dict[str, Any]: Structured output with text, tables, and key-value pairs.
 
-		except Exception as e:
-			error_msg = f"Error parsing Textract response: {str(e)} {frappe.get_traceback()}"
-			structured_output["errors"].append(error_msg)
-			return structured_output
+        Raises:
+            Exception: For parsing errors, logged and returned in output.
+        """
+        structured_output = {
+            "text": [],
+            "tables": [],
+            "key_value_pairs": [],
+            "query_results": {},
+            "errors": []
+        }
 
-	def parse_query_block(self, blocks):
-		"""
-		Parse query blocks from Textract response.
+        try:
+            for page in document.pages:
+                for line in page.lines:
+                    if line.text not in structured_output["text"]:
+                        structured_output["text"].append(line.text)
 
-		Args:
-			blocks (list): List of Textract blocks containing queries.
+                for table in page.tables:
+                    table_data = [[cell.text.strip() for cell in row.cells] for row in table.rows]
+                    if table_data not in structured_output["tables"]:
+                        structured_output["tables"].append(table_data)
 
-		Returns:
-			list: Parsed query results.
-		"""
-		query_results = {}
+                for field in page.form.fields:
+                    key = field.key.text.strip() if field.key else ""
+                    value = field.value.text.strip() if field.value else ""
+                    kv_pair = {"key": key, "value": value}
+                    if kv_pair not in structured_output["key_value_pairs"]:
+                        structured_output["key_value_pairs"].append(kv_pair)
 
-		for block in blocks:
-			if block.get("BlockType") == "QUERY" and block.get("Relationships"):
-				query_text = block.get("Query", "").get("Text", "")
-				for answer in block.get("Relationships", []):
-					if answer.get("Type") == "ANSWER":
-						for answer_id in answer.get("Ids", []):
-							if answer_id not in query_results:
-								query_results[answer_id] = {
-									"query_text": query_text,
-									"query_answer": ""
-								}
-							else:
-								# If already exists, just update the text
-								query_results[answer_id]["query_text"] = query_text
+            structured_output["query_results"] = self.parse_queryies_from_doc(document.queries)
+            log_vision(
+                provider="AWS Textract",
+                method="POST",
+                status="Success",
+                url="parse_textract_response",
+                status_code=200,
+                request=None,
+                response=json.dumps(structured_output, indent=4)
+            )
+            return structured_output
 
-			elif block.get("BlockType") == "QUERY_RESULT":
-				if block.get("Id") in query_results:
-					query_results[block.get("Id")]["query_answer"] = block.get("Text", "")
-				else:
-					query_results[block.get("Id")] = {
-						"query_text": "",
-						"query_answer": block.get("Text", "")
-					}
+        except Exception as e:
+            error_msg = f"Error parsing Textract response: {str(e)} {frappe.get_traceback()}"
+            structured_output["errors"].append(error_msg)
+            return structured_output
 
-		return query_results
+    def get_standard_output_from_expense(self, document: TextractDocument):
+        """
+        Parse document object and structure a standard key value pairs from expense document
 
+        Args:
+            document (Textract Document): Textract Expense Document
+
+        Returns:
+            Dict[str, any]: Structured output with primary fields and line item lists.
+        """
+        res = {}
+        primary_fields = {}
+        line_items = []
+
+        expense_doc = document.expense_documents[0]
+        line_item_group = expense_doc.line_items_groups[0].to_pandas()
+        df = pd.DataFrame(line_item_group)
+        df_records = df.to_dict('records')
+
+        for key, value in expense_doc.summary_fields.items():
+            field = key.lower()
+            answer = str()
+
+            if len(value) == 1:
+                answer = str(value[0]).lower().split(": ")[1]
+            else:
+                answer = value
+
+            primary_fields.update({
+                field : answer
+            })
+
+        for row in df_records:
+            item_row = {}
+            for key, value in row.items():
+                field = key.lower()
+
+                if field == 'product_code':
+                    field = 'hsn_code'
+
+                item_row.update({
+                    field: value
+                })
+
+                if field == 'quantity':
+                    qty_and_uom = self.get_qty_and_uom(value)
+                    if not qty_and_uom:
+                        continue
+                    item_row.update({
+                        field: qty_and_uom.get(field),
+                        "uom": qty_and_uom.get('uom')
+                    })
+
+            line_items.append(item_row)
+
+        res = {
+            "primary_fields": primary_fields,
+            "line_items": line_items,
+            "document": document
+        }
+
+        return res
+
+    def get_qty_and_uom(self, value):
+        res = {}
+        match = re.match(r'(\d+\.?\d*)\s*(\w+)', value)
+        if match:
+            quantity = float(match.group(1))
+            uom = match.group(2).capitalize()
+            res.update({"quantity": quantity, "uom": uom})
+        return res
+
+    def parse_queryies_from_doc(self, queries):
+        """
+        Parse query blocks from Textract Document Object.
+
+        Args:
+            queries (list): List of Queries containing query results and query.
+
+        Returns:
+            list: Parsed query results.
+        """
+        query_results = {}
+        for query in queries:
+            if query.result:
+                query_results[query.query] = {
+                    "answer": query.result.answer,
+                    "confidence": query.result.confidence
+                }
+            else:
+                query_results[query.query] = {}
+        return query_results
+
+    def normalize_textract_document(self, document: TextractDocument, file_path: str):
+        """
+        Normalize Textract document to a standard format.
+
+        Args:
+            document (Document Object): Parsed Textract document.
+
+        Returns:
+            Document Object: Normalized Textract document.
+        """
+        document_type = self.get_document_type(document)
+        if document_type in self.document_types:
+            expense_doc = self.analyze_expense(
+                file_url=file_path
+            )
+            return self.get_standard_output_from_expense(expense_doc)
+        else:
+            return self.get_structured_output_from_document(document)
+
+    def get_document_type(self, document: TextractDocument):
+        """
+        Determine the type of document based on its content.
+
+        Args:
+            document (Document Object): Parsed Textract document.
+
+        Returns:
+            str: Document type (e.g., "Invoice", "Receipt", etc.).
+        """
+        type = None
+        for query in document.queries:
+            if query.result:
+                if str(query.result.answer).capitalize() in self.document_types:
+                    type = str(query.result.answer).capitalize()
+            else:
+                type = "Other"
+        return type
 
 def test_aws_analyze_document():
-	"""Test function to analyze a document using AWS Textract."""
-	connector = AWSTextractConnector()
-	file_url = "/files/Grandmall casio Watch GST Invoice-10.02.2025-1.pdf"
-
-	try:
-		result = connector.analyze_document(file_url)
-		structured_result = connector.parse_textract_response(result)
-
-		print("Textract Analysis Result:", structured_result)
-	except Exception as e:
-		print("Error during Textract analysis:", str(e))
+    """Test function to analyze a document using AWS Textract."""
+    connector = AWSTextractConnector()
+    file_url = "/files/auto wings bill.pdf"
+    try:
+        result = connector.analyze_document(file_url)
+        frappe.log_error(title="Textract Analysis Result:", message=result)
+        return result
+    except Exception as e:
+        frappe.log_error(title="Textract Analysis Error:", message=frappe.get_traceback())
