@@ -1,0 +1,96 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-06-10 15:51:15.553263",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "ocr_configuration_section",
+  "is_enabled",
+  "ocr_provider",
+  "aws_textract_section",
+  "aws_access_key_id",
+  "aws_region",
+  "column_break_flfv",
+  "aws_secret_access_key",
+  "test_connection"
+ ],
+ "fields": [
+  {
+   "fieldname": "ocr_configuration_section",
+   "fieldtype": "Section Break",
+   "label": "OCR Configuration"
+  },
+  {
+   "depends_on": "is_enabled",
+   "fieldname": "ocr_provider",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "OCR Provider",
+   "mandatory_depends_on": "is_enabled",
+   "options": "\nAWS Textract\nGoogle Document AI\nAzure AI Vision"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_enabled",
+   "fieldtype": "Check",
+   "label": "Is enabled"
+  },
+  {
+   "depends_on": "eval: doc.ocr_provider === \"AWS Textract\";",
+   "fieldname": "aws_textract_section",
+   "fieldtype": "Section Break",
+   "label": "AWS Textract"
+  },
+  {
+   "fieldname": "column_break_flfv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "aws_access_key_id",
+   "fieldtype": "Data",
+   "label": "Access Key ID"
+  },
+  {
+   "fieldname": "aws_secret_access_key",
+   "fieldtype": "Password",
+   "label": "Secret Access Key"
+  },
+  {
+   "fieldname": "aws_region",
+   "fieldtype": "Data",
+   "label": "Region"
+  },
+  {
+   "fieldname": "test_connection",
+   "fieldtype": "Button",
+   "label": "Test Connection",
+   "options": "test_aws_connection"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-06-10 17:50:22.259910",
+ "modified_by": "Administrator",
+ "module": "Frappe Vision",
+ "name": "Vision Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

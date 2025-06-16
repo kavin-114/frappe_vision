@@ -1,0 +1,19 @@
+{
+ "content": null,
+ "creation": "2025-06-10 18:57:42.160020",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2025-06-10 18:57:42.160020",
+ "modified_by": "Administrator",
+ "module": "Frappe Vision",
+ "name": "vision-ocr",
+ "owner": "Administrator",
+ "page_name": "vision-ocr",
+ "roles": [],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Vision OCR AI"
+}

@@ -1,0 +1,92 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-06-10 19:13:15.442594",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "ocr_provider",
+  "url",
+  "column_break_nivh",
+  "status",
+  "method",
+  "http_status_code",
+  "section_break_ddqd",
+  "request_data",
+  "response_data"
+ ],
+ "fields": [
+  {
+   "fieldname": "ocr_provider",
+   "fieldtype": "Select",
+   "label": "OCR Provider",
+   "options": "\nAWS Textract\nGoogle Vision AI\nAzure OCR AI"
+  },
+  {
+   "fieldname": "method",
+   "fieldtype": "Select",
+   "label": "Method",
+   "options": "GET\nPOST\nPUT\nPATCH\nHEAD\nOPTIONS\nDELETE"
+  },
+  {
+   "fieldname": "url",
+   "fieldtype": "Data",
+   "label": "Endpoint"
+  },
+  {
+   "fieldname": "column_break_nivh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Pending\nSuccess\nFailed"
+  },
+  {
+   "fieldname": "section_break_ddqd",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "request_data",
+   "fieldtype": "JSON",
+   "label": "Request Data"
+  },
+  {
+   "fieldname": "response_data",
+   "fieldtype": "JSON",
+   "label": "Response Data"
+  },
+  {
+   "fieldname": "http_status_code",
+   "fieldtype": "Data",
+   "label": "HTTP Status Code"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-06-10 19:33:01.156397",
+ "modified_by": "Administrator",
+ "module": "Frappe Vision",
+ "name": "Vision Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
