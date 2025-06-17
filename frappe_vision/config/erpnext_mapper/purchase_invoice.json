@@ -1,0 +1,33 @@
+{
+  "bill_no": "invoice_id",
+  "bill_date": "invoice_date",
+  "tax_id": "tax_payer_id",
+  "credit_to": "account_number",
+  "supplier": "vendor_name",
+  "supplier_name": "vendor_name",
+  "company": "receiver_name",
+  "supplier_address_display": "vendor_address",
+  "shipping_address_display": "receiver_address",
+  "due_date": "due_date",
+  "payment_terms_template": "payment_terms",
+  "grand_total": "total",
+  "net_total": "subtotal",
+  "taxes_and_charges": "tax",
+  "outstanding_amount": "amount_due",
+  "paid_amount": "amount_paid",
+  "discount_amount": "discount",
+  "shipping_rule": "shipping_charge",
+  "gstin": "vendor_gst_number",
+  "pan": "vendor_pan_number",
+  "contact_mobile": "vendor_phone",
+  "contact_email": "vendor_url",
+  "items": {
+        "item_name": "description",
+        "description": "description",
+        "rate": "rate",
+        "amount": "amount",
+        "qty": "quantity",
+        "uom": "uom",
+        "hsn_code": "hsn_code"
+    }
+}

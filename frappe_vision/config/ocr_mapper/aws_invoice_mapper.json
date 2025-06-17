@@ -1,0 +1,50 @@
+{
+			"fields": {
+				"invoice_id": "fields.invoice_receipt_id",
+				"invoice_date": "fields.invoice_receipt_date",
+				"tax_payer_id": "fields.tax_payer_id",
+				"customer_number": "fields.customer_number",
+				"account_number": "fields.account_number",
+				"vendor_name": "fields.vendor_name",
+				"receiver_name": "fields.receiver_name",
+				"vendor_address": "fields.vendor_address",
+				"receiver_address": "fields.receiver_address",
+				"order_date": "fields.order_date",
+				"due_date": "fields.due_date",
+				"delivery_date": "fields.delivery_date",
+				"po_number": "fields.po_number",
+				"payment_terms": "fields.payment_terms",
+				"total": "fields.total",
+				"amount_due": "fields.amount_due",
+				"amount_paid": "fields.amount_paid",
+				"subtotal": "fields.subtotal",
+				"tax": "fields.tax",
+				"service_charge": "fields.service_charge",
+				"gratuity": "fields.gratuity",
+				"prior_balance": "fields.prior_balance",
+				"discount": "fields.discount",
+				"shipping_charge": "fields.shipping_handling_charge",
+				"vendor_abn_number": "fields.vendor_abn_number",
+				"vendor_gst_number": "fields.vendor_gst_number",
+				"vendor_pan_number": "fields.vendor_pan_number",
+				"vendor_vat_number": "fields.vendor_vat_number",
+				"receiver_abn_number": "fields.receiver_abn_number",
+				"receiver_gst_number": "fields.receiver_gst_number",
+				"receiver_pan_number": "fields.receiver_pan_number",
+				"receiver_vat_number": "fields.receiver_vat_number",
+				"vendor_phone": "fields.vendor_phone",
+				"receiver_phone": "fields.receiver_phone",
+				"vendor_url": "fields.vendor_url"
+			},
+			"items": {
+				"path": "items",
+				"mapping": {
+					"description": "item",
+					"quantity": "quantity",
+					"uom": "uom",
+					"rate": "unit_price",
+					"amount": "price",
+					"hsn_code": "product_code"
+				}
+			}
+		}
