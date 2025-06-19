@@ -2,6 +2,7 @@ import json
 import os
 from rapidfuzz import process
 import frappe
+from frappe.utils import getdate, get_date_str
 
 
 class ERPNextDocumentMapper:
@@ -15,7 +16,7 @@ class ERPNextDocumentMapper:
 		self.item_mapping = self.mapping.pop("items", {}) if "items" in self.mapping else {}
 		self.link_fields = self.get_link_fields()
 		self.table_link_fields = self.get_link_fields(True)
-		print(self.table_link_fields)
+		# print(self.table_link_fields)
 
 	def _load_mapper_from_file(self) -> dict:
 		filename = self.doctype.lower().replace(" ", "_") + ".json"
@@ -71,8 +72,10 @@ class ERPNextDocumentMapper:
 
 		if docnames:
 			match, score = process.extractOne(value.strip().capitalize(), mapped_candidates.keys())
-			if score > 70:
+			if score > 75:
 				return mapped_candidates.get(match)
+			else:
+				pass
 
 		return None
 
@@ -84,8 +87,15 @@ class ERPNextDocumentMapper:
 		for target_field, source_key in self.mapping.items():
 			value = source_fields.get(source_key, "")
 
+			fieldtype = self.get_fieldtype(target_field, self.doctype)
+
+			# Handle Date fields
+			if fieldtype and fieldtype == 'Date':
+				if isinstance(value, str):
+					value = get_date_str(getdate(value, True))
+
 			# Resolve link fields
-			if target_field in self.link_fields and value:
+			if fieldtype == 'Link' and target_field in self.link_fields and value:
 				value = self.resolve_link_field(value, self.link_fields.get(target_field))
 
 			mapped_doc[target_field] = value
@@ -107,6 +117,8 @@ class ERPNextDocumentMapper:
 				# Resolve link fields
 				if fieldname in self.table_link_fields and value:
 					for table_fieldname, doctype in self.table_link_fields.get(fieldname).items():
+						if self.get_fieldtype(table_fieldname, doctype) == 'Date':
+							value = get_date_str(value)
 						if target_field == table_fieldname:
 							value = self.resolve_link_field(value, doctype)
 
@@ -124,6 +136,12 @@ class ERPNextDocumentMapper:
 			if not doc.get(field):
 				missing.append(field)
 		return missing
+
+	def get_fieldtype(self, fieldname, doctype):
+		meta = frappe.get_meta(doctype)
+		field = meta.get_field(fieldname)
+
+		return field.fieldtype if field else None
 
 
 import os

@@ -26,7 +26,9 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/frappe_vision/css/frappe_vision.css"
-# app_include_js = "/assets/frappe_vision/js/frappe_vision.js"
+app_include_js = [
+    "frappe.vision.bundle.js"
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/frappe_vision/css/frappe_vision.css"
@@ -44,7 +46,7 @@ app_license = "mit"
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_list_js = {"Purchase Invoice" : "public/js/purchase_invoice_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 

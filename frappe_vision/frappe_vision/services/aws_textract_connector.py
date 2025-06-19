@@ -227,41 +227,22 @@ class AWSTextractConnector:
 			Dict[str, any]: Structured output with primary fields and line item lists.
 		"""
 		res = {}
-		primary_fields = {}
 		primary_field_groups = {}
 		line_items = []
-		under_confidence_fields = {}
 
 		expense_doc = document.expense_documents[0]
 		line_item_group = expense_doc.line_items_groups[0].to_pandas()
 		df = pd.DataFrame(line_item_group)
 		df_records = df.to_dict('records')
 
-		for key, value in expense_doc.summary_fields.items():
-			field = key.lower()
+		normalized_fields = self.get_normalized_primary_fields(expense_doc.summary_fields_list)
+		primary_fields = normalized_fields.get("primary_fields")
 
-			if len(value) == 1:
-				answer = value[0].value.text
-				confidence = value[0].value.confidence
-
-				if confidence > float(75):
-					primary_fields.update({
-						field : answer
-					})
-				else:
-					under_confidence_fields.update({
-						field: {
-							"value": answer,
-							"confidence": confidence
-						}
-					})
-			elif len(value) == 2:
-				primary_fields.update(self._get_key_value_from_list_values(field, value))
-			else:
-				primary_field_groups.update({
-					field : self._structure_field_groups(field, value)
-				})
-
+		# # tax normalization
+		# if "tax" in primary_fields and isinstance(primary_fields["tax"], list):
+		# 	tax = self.normalize_tax_fields(primary_fields["tax"])
+		# 	primary_fields["total_tax_rate"] = tax.get("total_percent")
+		# 	primary_fields["total_tax_amount"] = tax.get("total_amount")
 
 		for row in df_records:
 			item_row = {}
@@ -287,11 +268,121 @@ class AWSTextractConnector:
 			"field_groups": primary_field_groups,
 			"fields": primary_fields,
 			"items": line_items,
-			"under_confidence_values": under_confidence_fields,
+			"under_confidence_values": normalized_fields.get("under_confidence_values"),
 			"document": document
 		}
 
 		return res
+
+	def normalize_tax_fields(self, tax_entries: list) -> dict:
+		tax = {
+			"cgst_percent": 0.0,
+			"sgst_percent": 0.0,
+			"igst_percent": 0.0,
+			"total_percent": 0.0,
+			"cgst_amount": 0.0,
+			"sgst_amount": 0.0,
+			"igst_amount": 0.0,
+			"total_amount": 0.0
+		}
+		for entry in tax_entries:
+			for raw_label, raw_value in entry.items():
+				label = raw_label.lower()
+				value = self._try_parse_value(raw_value)
+				if re.search(r"sgst.*%", label):
+					tax["sgst_percent"] = value
+				elif re.search(r"cgst.*%", label):
+					tax["cgst_percent"] = value
+				elif re.search(r"igst.*%", label):
+					tax["igst_percent"] = value
+				elif re.search(r"net.*%|total.*%", label):
+					tax["total_percent"] = value
+				elif re.search(r"sgst.*amt|sgst.*amount", label):
+					tax["sgst_amount"] = value
+				elif re.search(r"cgst.*amt|cgst.*amount", label):
+					tax["cgst_amount"] = value
+				elif re.search(r"igst.*amt|igst.*amount", label):
+					tax["igst_amount"] = value
+				elif re.search(r"net.*amt|total.*amt|tax.*amt", label):
+					tax["total_amount"] = max(tax["total_amount"], value)
+		return tax
+
+	def _try_parse_value(self, val):
+		try:
+			return float(re.sub(r"[^\d.]+", "", val))
+		except:
+			return val.strip()
+
+	def get_normalized_primary_fields(self, summary_fields_list:list):
+		primary_fields = {}
+		under_confidence_fields = {}
+
+		for row in summary_fields_list:
+			key = row.type.text.lower()
+			value = row._value.text
+			confidence = row._value.confidence
+
+			if row._currency and not "currency" in primary_fields:
+				primary_fields.update({
+					"currency": row._currency
+				})
+
+			if key == 'other' and row._key:
+				label_name = self._sanitize_the_text(row._key)
+
+				if not 'other' in primary_fields:
+					primary_fields['other'] = []
+
+				primary_fields['other'].append({
+					label_name: value
+				})
+
+				continue
+
+			if key == 'tax' and row._key:
+				label_name = self._sanitize_the_text(row._key)
+
+				if not 'tax' in primary_fields:
+					primary_fields['tax'] = []
+
+				primary_fields['tax'].append({
+					label_name: value
+				})
+
+				continue
+
+			if key in primary_fields:
+				if label_name:= row._key:
+
+					key = (key + '_' + self._sanitize_the_text(label_name))
+
+
+			key = key.replace(":", "").strip()
+
+			if key in primary_fields and primary_fields.get(key) == value:
+				print(primary_fields.get(key))
+				continue
+
+			if confidence > 75:
+				primary_fields.update({
+					key: value
+				})
+			else:
+				under_confidence_fields.update({
+					key: {
+						'value': value,
+						'confidence': confidence
+					}
+				})
+
+		return {"primary_fields": primary_fields, "under_confidence_fields": under_confidence_fields}
+
+	def _sanitize_the_text(self, value):
+		return (value.text.lower()
+				.replace(":", "").strip().replace(" ", "_")
+				.replace("/", "").replace(".", ""))
+
+	# def _group_common_values(self, )
 
 	def _get_key_value_from_list_values(self, parent_key, values):
 		res = {}
@@ -305,62 +396,6 @@ class AWSTextractConnector:
 			else:
 				res.update({key: value})
 				existing_keys[key] = value
-
-		return res
-
-	# def _structure_field_groups(self, input_list):
-	# 	structured_dict = {}
-	# 	key_counts = {}
-
-	# 	for item in input_list:
-	# 		if ':' in str(item):
-	# 			item_key, item_value = str(item).split(':', 1)
-	# 			# Clean up the item_key by removing unwanted characters and spaces
-	# 			item_key = item_key.strip().replace('(', '').replace(')', '').replace(':', '').replace('/', '_').replace(' ', '_').lower()
-	# 			item_value = item_value.strip()
-
-	# 			# Check if the key already exists in the dictionary
-	# 			if item_key in key_counts:
-	# 				# Increment the count and append it to the key
-	# 				key_counts[item_key] += 1
-	# 				item_key = f"{item_key}_{key_counts[item_key]}"
-	# 			else:
-	# 				# Initialize the count for the key
-	# 				key_counts[item_key] = 1
-
-	# 			# Use the cleaned item_key as the key in the dictionary
-	# 			structured_dict[item_key] = item_value
-
-	# 	return structured_dict
-
-	def _structure_field_groups(self, parent_key, values):
-		res = {}
-		key_counts = {}
-		for field in values:
-		# item_key, item_value = str(item).split(':', 1)
-		# Clean up the item_key by removing unwanted characters and spaces
-			item_key = field.key.text if field.key else parent_key
-			item_key = item_key.strip().replace('(', '').replace(')', '').replace(':', '').replace('/', '_').replace(' ', '_').lower()
-			item_value = field.value.text.strip()
-			confidence = field.value.confidence
-
-			# Check if the key already exists in the dictionary
-			if item_key in key_counts:
-				# Increment the count and append it to the key
-				key_counts[item_key] += 1
-				item_key = f"{item_key}_{key_counts[item_key]}"
-			else:
-				# Initialize the count for the key
-				key_counts[item_key] = 1
-
-			# Use the cleaned item_key as the key in the dictionary
-			if confidence > float(75):
-				res[item_key] = item_value
-			else:
-				res[item_key] = {
-					"value": item_value,
-					"confidence": confidence
-				}
 
 		return res
 
@@ -444,31 +479,3 @@ def test_aws_analyze_document():
 	except Exception as e:
 		print("Textract Analysis Error", frappe.get_traceback())
 		frappe.log_error(title="Textract Analysis Error:", message=frappe.get_traceback())
-
-
-
-
-def _structure_field_groups(input_list):
-		structured_dict = {}
-		key_counts = {}
-
-		for item in input_list:
-			if ':' in item:
-				item_key, item_value = item.split(':', 1)
-				# Clean up the item_key by removing unwanted characters and spaces
-				item_key = item_key.strip().replace('(', '').replace(')', '').replace(':', '').replace('/', '_').replace(' ', '_').lower()
-				item_value = item_value.strip()
-
-				# Check if the key already exists in the dictionary
-				if item_key in key_counts:
-					# Increment the count and append it to the key
-					key_counts[item_key] += 1
-					item_key = f"{item_key}_{key_counts[item_key]}"
-				else:
-					# Initialize the count for the key
-					key_counts[item_key] = 1
-
-				# Use the cleaned item_key as the key in the dictionary
-				structured_dict[item_key] = item_value
-
-		return structured_dict
