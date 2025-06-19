@@ -19,6 +19,7 @@
 				"amount_paid": "fields.amount_paid",
 				"subtotal": "fields.subtotal",
 				"tax": "fields.tax",
+				"currency": "fields.currency",
 				"service_charge": "fields.service_charge",
 				"gratuity": "fields.gratuity",
 				"prior_balance": "fields.prior_balance",
@@ -39,6 +40,7 @@
 			"items": {
 				"path": "items",
 				"mapping": {
+					"item_name": "item",
 					"description": "item",
 					"quantity": "quantity",
 					"uom": "uom",

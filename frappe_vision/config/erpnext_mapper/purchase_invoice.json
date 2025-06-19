@@ -22,7 +22,8 @@
   "contact_mobile": "vendor_phone",
   "contact_email": "vendor_url",
   "items": {
-        "item_name": "description",
+        "item_code": "item_name",
+        "item_name": "item_name",
         "description": "description",
         "rate": "rate",
         "amount": "amount",

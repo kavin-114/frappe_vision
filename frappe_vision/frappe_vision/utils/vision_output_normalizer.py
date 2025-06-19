@@ -147,8 +147,7 @@ def test_vision_output_normalizer(raw_output=None):
 						'quantity': 3.0,
 						'product_code': '87083000',
 						'uom': 'Set',
-						'unit_price':
-						'9921.88'
+						'unit_price': '9921.88'
 					}
 				]}
 
